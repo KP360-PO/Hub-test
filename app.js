@@ -659,6 +659,16 @@ function wireGlobalSearch(){
   });
 }
 
+/* ===== Initial triggers ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  const initial = (location.hash || '#home').replace('#','') || 'home';
+
+  if (initial === 'home') { openTPModalSkeleton(); loadTopPerformers(true); }
+  else { loadTopPerformers(false); }
+
+  setActive(initial);
+  wireGlobalSearch();
+
   // Prefetch tabs so search is ready quickly
   const TABS_TO_PREFETCH = Object.keys(TAB_REGISTRY);
   Promise.all(
@@ -671,6 +681,10 @@ function wireGlobalSearch(){
         .catch(()=>{})
     )
   );
+
+  if (initial === 'supplier-contacts') setTimeout(loadSupplierContacts, 0);
+  console.log('[Portal] init OK — search ready:', !!document.getElementById('globalSearch'));
+});
 
   if (initial === 'supplier-contacts') setTimeout(loadSupplierContacts, 0);
   console.log('[Portal] init OK — search ready:', !!document.getElementById('globalSearch'));
@@ -722,20 +736,27 @@ function rowsToLinkItems(headers, rows){
 }
 
 /* ========= Passcode Gate (per-tab session) ========= */
+/* ========= Passcode Gate (per-tab session) ========= */
 const CORRECT_PASSCODE = "po360"; // change to your passcode
 
-function checkPasscode() {
+function checkPasscode(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
   const inputEl = document.getElementById("passInput");
   const lock = document.getElementById("lockScreen");
   const error = document.getElementById("errorMsg");
+
   if (!inputEl || !lock) return;
 
-  const input = inputEl.value.trim();
+  const input = (inputEl.value || "").trim();
   if (input === CORRECT_PASSCODE) {
+    // success
+    sessionStorage.setItem("siteUnlocked", "true"); // only for this tab
+    if (error) error.style.display = "none";
     lock.style.opacity = "0";
     setTimeout(() => { lock.style.display = "none"; }, 300);
-    sessionStorage.setItem("siteUnlocked", "true"); // only for this tab
   } else {
+    // fail
     if (error) error.style.display = "block";
   }
 }
@@ -743,10 +764,20 @@ function checkPasscode() {
 (function initPasscode(){
   const lock = document.getElementById("lockScreen");
   const input = document.getElementById("passInput");
-  if (!lock) return;
+  const unlockBtn = document.querySelector("#lockScreen button");
 
+  if (!lock) return; // if you didn't include the lock HTML, skip
+
+  // If already unlocked in this tab, hide immediately
   if (sessionStorage.getItem("siteUnlocked") === "true") {
     lock.style.display = "none";
+    return;
   }
-  input?.addEventListener("keyup", (e)=>{ if (e.key === "Enter") checkPasscode(); });
+
+  // Make sure handlers are wired (even if inline onclick is removed)
+  unlockBtn?.addEventListener("click", checkPasscode);
+  input?.addEventListener("keydown", (e)=>{ if (e.key === "Enter") checkPasscode(e); });
+
+  // Defensive: if anything throws elsewhere and results dropdown listeners run,
+  // it won't block the gate — this handler is independent.
 })();
