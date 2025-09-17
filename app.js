@@ -737,47 +737,66 @@ function rowsToLinkItems(headers, rows){
 
 /* ========= Passcode Gate (per-tab session) ========= */
 /* ========= Passcode Gate (per-tab session) ========= */
-const CORRECT_PASSCODE = "po360"; // change to your passcode
+const CORRECT_PASSCODE = "po360"; // change as needed
 
 function checkPasscode(e) {
-  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  try {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    const inputEl = document.getElementById("passInput");
+    const lock    = document.getElementById("lockScreen");
+    const error   = document.getElementById("errorMsg");
 
-  const inputEl = document.getElementById("passInput");
-  const lock = document.getElementById("lockScreen");
-  const error = document.getElementById("errorMsg");
+    if (!inputEl || !lock) {
+      console.warn("[Gate] Missing #passInput or #lockScreen");
+      return;
+    }
 
-  if (!inputEl || !lock) return;
+    const input = (inputEl.value || "").trim();
+    console.log("[Gate] Submitted:", JSON.stringify(input));
 
-  const input = (inputEl.value || "").trim();
-  if (input === CORRECT_PASSCODE) {
-    // success
-    sessionStorage.setItem("siteUnlocked", "true"); // only for this tab
-    if (error) error.style.display = "none";
-    lock.style.opacity = "0";
-    setTimeout(() => { lock.style.display = "none"; }, 300);
-  } else {
-    // fail
-    if (error) error.style.display = "block";
+    const ok = input === CORRECT_PASSCODE;
+    if (error) error.style.display = ok ? "none" : "block";
+
+    if (ok) {
+      sessionStorage.setItem("siteUnlocked", "true"); // this tab only
+      // Remove the overlay entirely so nothing can block clicks
+      lock.remove();
+      console.log("[Gate] Unlocked and removed overlay.");
+    } else {
+      console.log("[Gate] Wrong passcode.");
+    }
+  } catch (err) {
+    console.error("[Gate] Exception:", err);
   }
 }
 
 (function initPasscode(){
-  const lock = document.getElementById("lockScreen");
-  const input = document.getElementById("passInput");
-  const unlockBtn = document.querySelector("#lockScreen button");
+  try {
+    const lock      = document.getElementById("lockScreen");
+    const input     = document.getElementById("passInput");
+    const unlockBtn = document.querySelector("#lockScreen button");
 
-  if (!lock) return; // if you didn't include the lock HTML, skip
+    if (!lock) {
+      console.log("[Gate] No lock screen found; skipping.");
+      return;
+    }
 
-  // If already unlocked in this tab, hide immediately
-  if (sessionStorage.getItem("siteUnlocked") === "true") {
-    lock.style.display = "none";
-    return;
+    // Already unlocked in this tab?
+    if (sessionStorage.getItem("siteUnlocked") === "true") {
+      lock.remove();
+      console.log("[Gate] Already unlocked, overlay removed on load.");
+      return;
+    }
+
+    // Wire events (works even if HTML still has onclick="checkPasscode()")
+    unlockBtn?.addEventListener("click", checkPasscode);
+    input?.addEventListener("keydown", (e)=>{ if (e.key === "Enter") checkPasscode(e); });
+
+    // Quality-of-life: focus the input
+    input?.focus();
+
+    console.log("[Gate] Ready. Waiting for passcode…");
+  } catch (err) {
+    console.error("[Gate] Init exception:", err);
   }
-
-  // Make sure handlers are wired (even if inline onclick is removed)
-  unlockBtn?.addEventListener("click", checkPasscode);
-  input?.addEventListener("keydown", (e)=>{ if (e.key === "Enter") checkPasscode(e); });
-
-  // Defensive: if anything throws elsewhere and results dropdown listeners run,
-  // it won't block the gate — this handler is independent.
 })();
