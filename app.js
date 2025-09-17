@@ -614,20 +614,50 @@ function renderResults(list, q){
 
 function wireGlobalSearch(){
   if (!domReadyForSearch()) return;
-  searchBtn?.addEventListener('click', doSearch);
-  searchInput?.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') doSearch(); });
+
+  const searchForm = document.querySelector('form.search');
+
+  // Handle form submit (click button or press Enter)
+  searchForm?.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    doSearch();
+  });
+
+  // Explicit button click (safety net)
+  searchBtn?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    doSearch();
+  });
+
+  // Enter key press inside the input
+  searchInput?.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      doSearch();
+    }
+  });
+
+  // Hide results when input is cleared
+  searchInput?.addEventListener('input', ()=>{
+    if (!searchInput.value.trim()){
+      resultsEl.classList.remove('visible');
+      resultsEl.innerHTML = '';
+    }
+  });
+
+  // Optional UX: close results on Escape or outside click
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') {
+      resultsEl.classList.remove('visible');
+      resultsEl.innerHTML = '';
+    }
+  });
+  document.addEventListener('click', (e)=>{
+    if (!resultsEl.contains(e.target) && e.target !== searchInput){
+      resultsEl.classList.remove('visible');
+    }
+  });
 }
-
-/* ===== Initial triggers ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  const initial = (location.hash || '#home').replace('#','') || 'home';
-
-  if (initial === 'home') { openTPModalSkeleton(); loadTopPerformers(true); }
-  else { loadTopPerformers(false); }
-
-  setActive(initial);
-
-  wireGlobalSearch();
 
   // Prefetch tabs so search is ready quickly
   const TABS_TO_PREFETCH = Object.keys(TAB_REGISTRY);
